@@ -30,6 +30,13 @@ terraform init
 terraform plan
 ```
 
+Environment-specific examples are available under `environments/`:
+
+```bash
+terraform plan -var-file=environments/development.tfvars
+terraform plan -var-file=environments/production.tfvars
+```
+
 ## Notes
 
 - The storage account is private by default and intended for generated compliance reports.

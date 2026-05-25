@@ -3,10 +3,22 @@ name: Validate and Simulate Deployment
 on:
   push:
     branches:
+      - dev
       - main
-      - master
   pull_request:
+    branches:
+      - dev
+      - main
   workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Environment to simulate deployment for
+        required: true
+        default: development
+        type: choice
+        options:
+          - development
+          - production
 
 permissions:
   contents: read
@@ -17,9 +29,55 @@ env:
   TERRAFORM_VERSION: "1.15.4"
 
 jobs:
+  resolve-environment:
+    name: Resolve target environment
+    runs-on: ubuntu-latest
+
+    outputs:
+      deployment_environment: ${{ steps.resolve.outputs.deployment_environment }}
+      terraform_var_file: ${{ steps.resolve.outputs.terraform_var_file }}
+      release_channel: ${{ steps.resolve.outputs.release_channel }}
+
+    steps:
+      - name: Resolve environment from branch or manual input
+        id: resolve
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            target_environment="${{ inputs.target_environment }}"
+          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.base_ref }}" == "main" ]]; then
+            target_environment="production"
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            target_environment="production"
+          else
+            target_environment="development"
+          fi
+
+          if [[ "$target_environment" == "production" ]]; then
+            terraform_var_file="environments/production.tfvars"
+            release_channel="stable"
+          else
+            terraform_var_file="environments/development.tfvars"
+            release_channel="dev"
+          fi
+
+          {
+            echo "deployment_environment=$target_environment"
+            echo "terraform_var_file=$terraform_var_file"
+            echo "release_channel=$release_channel"
+          } >> "$GITHUB_OUTPUT"
+
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Target Environment
+
+          - Environment: $target_environment
+          - Terraform variables: $terraform_var_file
+          - Release channel: $release_channel
+          EOF
+
   backend-quality:
     name: Backend tests and lint
     runs-on: ubuntu-latest
+    needs: resolve-environment
 
     defaults:
       run:
@@ -48,6 +106,7 @@ jobs:
   dashboard-quality:
     name: Dashboard syntax check
     runs-on: ubuntu-latest
+    needs: resolve-environment
 
     steps:
       - name: Checkout repository
@@ -69,6 +128,7 @@ jobs:
   docker-validation:
     name: Docker Compose validation
     runs-on: ubuntu-latest
+    needs: resolve-environment
 
     steps:
       - name: Checkout repository
@@ -83,6 +143,7 @@ jobs:
   terraform-validation:
     name: Terraform format and validate
     runs-on: ubuntu-latest
+    needs: resolve-environment
 
     defaults:
       run:
@@ -107,9 +168,13 @@ jobs:
         run: terraform validate
 
   deployment-simulation:
-    name: Simulated deployment readiness
+    name: Simulated ${{ needs.resolve-environment.outputs.deployment_environment }} deployment
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    environment:
+      name: ${{ needs.resolve-environment.outputs.deployment_environment }}
     needs:
+      - resolve-environment
       - backend-quality
       - dashboard-quality
       - docker-validation
@@ -120,12 +185,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate deployment simulation summary
+        env:
+          DEPLOYMENT_ENVIRONMENT: ${{ needs.resolve-environment.outputs.deployment_environment }}
+          RELEASE_CHANNEL: ${{ needs.resolve-environment.outputs.release_channel }}
+          TERRAFORM_VAR_FILE: ${{ needs.resolve-environment.outputs.terraform_var_file }}
         run: |
           mkdir -p build
           cat > build/deployment-simulation.md <<'EOF'
           # Deployment Simulation
 
           This workflow validates the project as if it were being prepared for an internal cloud/platform deployment.
+
+          ## Target
+
+          - Environment: ${DEPLOYMENT_ENVIRONMENT}
+          - Release channel: ${RELEASE_CHANNEL}
+          - Terraform variables: infra/azure/${TERRAFORM_VAR_FILE}
 
           ## Validated
 
@@ -136,16 +211,34 @@ jobs:
 
           ## Simulated Deployment Steps
 
-          1. Build backend and dashboard containers.
-          2. Validate Terraform Azure foundation.
-          3. Confirm demo application can be started with Docker Compose.
-          4. Mark the release candidate as ready for manual Azure planning.
+          1. Select the environment from the branch or manual workflow input.
+          2. Build backend and dashboard containers.
+          3. Validate Terraform Azure foundation.
+          4. Select the environment-specific Terraform variable file.
+          5. Mark the release candidate as ready for manual Azure planning.
 
           ## Notes
 
           No Azure resources are created by this workflow. A real deployment would add authenticated
-          `terraform plan` and `terraform apply` jobs using federated identity or managed credentials.
+          `terraform plan -var-file="${TERRAFORM_VAR_FILE}"` and `terraform apply` jobs using
+          federated identity or managed credentials.
           EOF
+
+          python - <<'PY'
+          from pathlib import Path
+          import os
+
+          path = Path("build/deployment-simulation.md")
+          content = path.read_text()
+          replacements = {
+              "${DEPLOYMENT_ENVIRONMENT}": os.environ["DEPLOYMENT_ENVIRONMENT"],
+              "${RELEASE_CHANNEL}": os.environ["RELEASE_CHANNEL"],
+              "${TERRAFORM_VAR_FILE}": os.environ["TERRAFORM_VAR_FILE"],
+          }
+          for key, value in replacements.items():
+              content = content.replace(key, value)
+          path.write_text(content)
+          PY
 
       - name: Publish simulation summary
         run: cat build/deployment-simulation.md >> "$GITHUB_STEP_SUMMARY"

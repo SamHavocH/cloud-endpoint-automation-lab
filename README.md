@@ -135,7 +135,16 @@ The repository includes a CI workflow at `.github/workflows/ci.yml` that validat
 - Terraform format, init, and validate.
 - Simulated deployment summary artifact.
 
-The workflow does not create Azure resources. A future production pipeline could add authenticated `terraform plan` and `terraform apply` stages using workload identity federation.
+Branch-to-environment behavior:
+
+| Branch | Environment | Terraform variables | Release channel |
+| --- | --- | --- | --- |
+| `dev` | `development` | `infra/azure/environments/development.tfvars` | `dev` |
+| `main` | `production` | `infra/azure/environments/production.tfvars` | `stable` |
+
+Pull requests run validation only. Pushes to `dev` or `main` run the simulated deployment job for the matching GitHub Environment. Manual workflow runs can choose either environment.
+
+The workflow does not create Azure resources. A future production pipeline could add authenticated `terraform plan -var-file=...` and `terraform apply` stages using workload identity federation.
 
 ## Project Structure
 

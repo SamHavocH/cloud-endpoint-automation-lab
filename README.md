@@ -125,6 +125,18 @@ make terraform-init
 make terraform-plan
 ```
 
+## GitHub Actions
+
+The repository includes a CI workflow at `.github/workflows/ci.yml` that validates the project like a deployment candidate:
+
+- Backend linting and tests.
+- Dashboard syntax check.
+- Docker Compose configuration and image build.
+- Terraform format, init, and validate.
+- Simulated deployment summary artifact.
+
+The workflow does not create Azure resources. A future production pipeline could add authenticated `terraform plan` and `terraform apply` stages using workload identity federation.
+
 ## Project Structure
 
 ```text

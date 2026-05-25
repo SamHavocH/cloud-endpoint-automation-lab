@@ -173,12 +173,37 @@ sample_reports/   Example CSV report output
 
 ## Screenshots
 
-Add screenshots after running the project locally:
+The screenshots below show the local demo workflow and CI validation path.
 
-- Dashboard overview
-- Filtered non-compliant devices
-- FastAPI Swagger UI
-- Terraform plan summary
+### Dashboard Overview
+
+![Endpoint Compliance Dashboard](docs/Endpoint_Compliance_Dashboard.png)
+
+### Filtered Non-Compliant Devices
+
+![Endpoint Compliance Dashboard filtered by non-compliant devices](docs/Endpoint_Compliance_Dashboard_filtrado.png)
+
+### Remediation Dry Run
+
+![Generate remediation recommendations for a selected device](docs/Generate_remediation_device_based.png)
+
+### Device Sync Simulation
+
+![Simulate an Intune-style device sync](docs/Simulate_sync.png)
+
+### FastAPI Swagger UI
+
+![FastAPI Swagger UI](docs/FastAPI_Swagger.png)
+
+### Compliance Report JSON
+
+![Compliance report JSON response](docs/Compliance_report_JSON.png)
+
+### GitHub Actions Validation
+
+![GitHub Actions validation workflow](docs/GitHub_Actions.png)
+
+More detail about each screenshot is available in `docs/screenshots.md`.
 
 ## Future Improvements
 

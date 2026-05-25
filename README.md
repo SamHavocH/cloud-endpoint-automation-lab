@@ -139,10 +139,17 @@ Branch-to-environment behavior:
 
 | Branch | Environment | Terraform variables | Release channel |
 | --- | --- | --- | --- |
-| `dev` | `development` | `infra/azure/environments/development.tfvars` | `dev` |
+| `develop` | `development` | `infra/azure/environments/development.tfvars` | `dev` |
 | `main` | `production` | `infra/azure/environments/production.tfvars` | `stable` |
 
-Pull requests run validation only. Pushes to `dev` or `main` run the simulated deployment job for the matching GitHub Environment. Manual workflow runs can choose either environment.
+Pull requests run validation only. Pushes to `develop` or `main` run the simulated deployment job for the matching GitHub Environment. Manual workflow runs can choose either environment.
+
+Main branch policy:
+
+- Direct commits to `main` should be blocked with GitHub branch protection.
+- Pull requests into `main` must come from `develop`.
+- The `Main merge policy` workflow check fails any PR targeting `main` from another source branch.
+- Detailed setup notes are in `docs/branch-protection.md`.
 
 The workflow does not create Azure resources. A future production pipeline could add authenticated `terraform plan -var-file=...` and `terraform apply` stages using workload identity federation.
 

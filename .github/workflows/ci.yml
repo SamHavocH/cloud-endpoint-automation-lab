@@ -3,11 +3,11 @@ name: Validate and Simulate Deployment
 on:
   push:
     branches:
-      - dev
+      - develop
       - main
   pull_request:
     branches:
-      - dev
+      - develop
       - main
   workflow_dispatch:
     inputs:
@@ -73,6 +73,22 @@ jobs:
           - Terraform variables: $terraform_var_file
           - Release channel: $release_channel
           EOF
+
+  main-merge-policy:
+    name: Main merge policy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+
+    steps:
+      - name: Require pull request source branch to be develop
+        run: |
+          if [[ "${{ github.head_ref }}" != "develop" ]]; then
+            echo "Pull requests into main must come from develop."
+            echo "Current source branch: ${{ github.head_ref }}"
+            exit 1
+          fi
+
+          echo "Main merge policy passed: source branch is develop."
 
   backend-quality:
     name: Backend tests and lint

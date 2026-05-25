@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: endpoint-lab-backend
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: sqlite:////data/endpoint_lab.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_data:/data
+
+  dashboard:
+    build:
+      context: ./dashboard
+    container_name: endpoint-lab-dashboard
+    environment:
+      BACKEND_API_URL: http://backend:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:
